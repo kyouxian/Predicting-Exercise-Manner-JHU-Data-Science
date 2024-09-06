@@ -1,0 +1,89 @@
+---
+title: "Predicting Exercise Manner - Report"
+author: "Yi Liu"
+date: "2024-09-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Introduction
+The goal of this project is to predict the manner in which individuals did an exercise. This is represented by the "classe" variable in the training dataset. We use various variables from the training set to build a predictive model and then apply it to predict the exercise manner for 20 different test cases.
+
+## 2. Data Preparation
+We started by importing the training and test datasets using the readr package.
+```{r}
+library(readr)
+library(caret)
+library(gbm)
+
+# import the training data set and the test cases
+pml_training <- read_csv("pml-training.csv")
+pml_testing <- read_csv("pml-testing.csv")
+```
+
+We then removed columns with mostly NA values from the training dataset.
+```{r}
+# Remove columns with mostly NA values
+pml_training_clean <- pml_training[, colSums(is.na(pml_training)) == 0]
+```
+
+Next, we removed unnecessary columns such as timestamps and user names.
+```{r}
+# Remove unnecessary columns (e.g., timestamps and user names)
+pml_training_clean <- pml_training_clean[, -c(1:7)]
+```
+
+We split the cleaned training data into training and validation sets using the createDataPartition function from the caret package.
+```{r}
+# Split the cleaned training data into training and validation sets
+set.seed(42)
+inTrain <- createDataPartition(pml_training_clean$classe, p = 0.7, list = FALSE)
+training <- pml_training_clean[inTrain, ]
+validation <- pml_training_clean[-inTrain, ]
+```
+
+## 3. Model Building
+We fit a Gradient Boosting Machines (GBM) model using the caret package. We used 10-fold cross-validation during training to assess the model's performance more robustly.
+```{r}
+# Fit a GBM model
+gbm_model <- train(classe ~., data = training, method = "gbm", trControl = trainControl(method = "cv", number = 10), metric = "Accuracy")
+```
+
+## 4. Model Evaluation
+We made predictions on the validation set and evaluated the model using the confusion matrix.
+```{r}
+# Make predictions on the validation set
+validation_preds <- predict(gbm_model, newdata = validation)
+
+# Evaluate the model on the validation set
+confusionMatrix(validation_preds, as.factor(validation$classe))
+```
+
+## 5. Test Set Predictions
+We cleaned the test data in the same way as the training data and made predictions on the test set using the trained GBM model.
+```{r}
+# Clean the test data in the same way as the training data
+pml_testing_clean <- pml_testing[, colnames(pml_testing) %in% colnames(pml_training_clean)[-ncol(pml_training_clean)]]
+
+# Make predictions on the test set
+test_preds <- predict(gbm_model, newdata = pml_testing_clean)
+```
+
+The predicted classes for the 20 test cases are contained in test_preds.
+
+## Cross-Validation
+We used 10-fold cross-validation during model training. This helps to obtain a more reliable estimate of the model's performance on unseen data and reduces the risk of overfitting. By averaging the performance across different folds, we can get a better sense of how the model will generalize to new data.
+
+## 7. Expected Out-of-Sample Error
+The out-of-sample error can be estimated by looking at the performance on the validation set. In our case, the confusion matrix provides information about the accuracy, precision, recall, and other metrics. By subtracting the accuracy from 100%, we can estimate the expected out-of-sample error. For example, if the accuracy on the validation set is 90%, then the expected out-of-sample error is approximately 10%.
+
+## Choices Made
+ - Removing columns with mostly missing values helps to simplify the data and focus on variables that are likely to be more informative.
+ - Using Gradient Boosting Machines provides a powerful ensemble method that can handle a large number of variables and potentially complex relationships between them.
+ - Performing cross-validation gives a more reliable estimate of the model's performance on unseen data and helps in tuning the model parameters to avoid overfitting.
+ 
+##  Conclusion
+In conclusion, we built a Gradient Boosting Machines model to predict the manner in which individuals did an exercise. The model was evaluated on a validation set and showed promising results. We also made predictions on 20 test cases, which can be used to further assess the model's performance in real-world scenarios. Future work could involve exploring other machine learning algorithms, performing more extensive feature engineering, and using ensemble methods to further improve the model's accuracy.
